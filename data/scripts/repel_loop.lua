@@ -72,7 +72,7 @@ async_loop(function()
 
 			local ui = EntityGetComponent(prop, "UIInfoComponent")
 			local pot = EntityGetComponent(prop, "PotionComponent")
-
+			
 			if (ui ~= nil) then
 
 				local str = ComponentGetValue(ui, "name")
@@ -105,6 +105,7 @@ async_loop(function()
 			local dir_x = dir_x / len
 			local dir_y = dir_y / len
 
+			print ("PUSH ", dir_x * power) 
 			PhysicsApplyForce(prop, dir_x * power, dir_y * power)
 
 		end

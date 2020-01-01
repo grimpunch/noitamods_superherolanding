@@ -50,6 +50,51 @@ local playerYVel = 0;
 local stompMin = 4.8;
 local gonnaStomp = false;
 local repelEnt = nil;
+local timeonground= 0;
+local damagecheckdone = false;
+
+local RADIUS = 50.0
+local MAX_STRENGTH = 20.0
+local MIN_STRENGTH = 2
+
+local function distance(x, y, x2, y2)
+
+	return math.sqrt(((x - x2)^2) + ((y - y2)^2))
+
+end
+
+local function length(x, y)
+
+	return math.sqrt((x * x) + (y * y))
+
+end
+
+local function get_phys_ents(me, x, y, rad)
+
+	local tbl = {}
+	local near = EntityGetInRadius(x, y, rad)
+
+	if (near == nil) then
+
+		return tbl
+
+	end
+
+	for k,v in pairs(near) do
+
+		local body = EntityGetComponent(v, "PhysicsBodyComponent")
+    
+		if (body ~= nil) then
+
+			table.insert(tbl, v)
+			
+		end
+
+	end
+
+	return tbl
+
+end
 
 function AddRepelCharge(entityToAttachTo)
 	local x,y = EntityGetTransform( entityToAttachTo )
@@ -76,20 +121,69 @@ function OnWorldPreUpdate()
 			playerYVel = tonumber( vel_y )
 			if(gonnaStomp == false and playerYVel > stompMin and GameHasFlagRun( get_perk_picked_flag_name( "SUPERHERO_LANDING" ) ) ) then
 				print( "Landing threshold reached: ", vel_y )
-				ComponentSetValue(player_data, "destroy_ground", 500)
-				ComponentSetValue(player_data, "eff_hg_damage_max", 2500)
-				ComponentSetValue(player_data, "eff_hg_damage_min", 1000)
-				ComponentSetValue(player_data, "eff_hg_size_x", 12)
-				ComponentSetValue(player_data, "eff_hg_size_y", 4)
+				ComponentSetValue(player_data, "destroy_ground", 1200)
+				ComponentSetValue(player_data, "eff_hg_damage_max", 4100)
+				ComponentSetValue(player_data, "eff_hg_damage_min", 3000)
+				ComponentSetValue(player_data, "eff_hg_size_x", 10)
+				ComponentSetValue(player_data, "eff_hg_size_y", 8)
 				AddRepelCharge(player_entity)
 				gonnaStomp = true;
+				damagecheckdone = false;
 			end
 			if(gonnaStomp and onGround ~= 1) then
 				GameScreenshake( playerYVel )
+				if(playerYVel < stompMin) then
+					-- cancel stomp if player y velocity reduces --
+					gonnaStomp = false;
+					damagecheckdone = true;
+					print( "Reseting SUPERHERO_LANDING")
+					ComponentSetValue(player_data, "destroy_ground", 0)
+					ComponentSetValue(player_data, "eff_hg_damage_max", 95)
+					ComponentSetValue(player_data, "eff_hg_damage_min", 10)
+					ComponentSetValue(player_data, "eff_hg_size_x", 6.42)
+					ComponentSetValue(player_data, "eff_hg_size_y", 5.14)
+					RemoveRepelCharge(player_entity)		
+					timeonground = 0;
+				end
 			end
 		end
 		
 	end
+end
+
+
+function dmgCheck()
+
+	local player_entity = ( EntityGetWithTag( "player_unit" ) ) [1]
+	if( player_entity ~= nil ) then
+		local x, y = EntityGetTransform(player_entity)
+
+		local props = get_phys_ents(player_entity, x, y, RADIUS)
+		for i, prop in pairs(props) do
+
+			local x2, y2 = EntityGetTransform(prop)
+			local dist = distance(x, y, x2, y2)
+			
+			if (dist < RADIUS) then
+		
+				local scale = 1.0 - (dist / RADIUS)
+				local power = scale * MAX_STRENGTH
+
+				if (power < MIN_STRENGTH) then
+					power = MIN_STRENGTH
+				end
+				
+				edit_component( prop, "ExplodeOnDamageComponent", function(comp,vars)
+					if( comp ~= nil ) then
+						EntityLoad( "data/entities/projectiles/explosion.xml", x2, y2 )
+					end
+				end)
+				
+			end
+
+		end
+	end
+
 end
 
 function OnWorldPostUpdate() -- This is called every time the game has finished updating the world
@@ -98,18 +192,30 @@ function OnWorldPostUpdate() -- This is called every time the game has finished 
 		local player_data = EntityGetFirstComponent(player_entity, "CharacterDataComponent") 
 		if( player_data ~= nil) then
 			local onGround = tonumber(ComponentGetValue(player_data,  "is_on_ground"))
-			if (onGround == 1 and gonnaStomp == true) then 
-				print( "Reseting SUPERHERO_LANDING")
-				GameScreenshake( 4 * playerYVel, 2 * playerYVel, 2 )
-				ComponentSetValue(player_data, "destroy_ground", 0)
-				ComponentSetValue(player_data, "eff_hg_damage_max", 95)
-				ComponentSetValue(player_data, "eff_hg_damage_min", 10)
-				ComponentSetValue(player_data, "eff_hg_size_x", 6.42)
-				ComponentSetValue(player_data, "eff_hg_size_y", 5.14)
-				gonnaStomp = false;
-				RemoveRepelCharge(player_entity)
-			end		
+			if(gonnaStomp == true and onGround == 1) then
+				GameScreenshake( 12 * playerYVel, 2 * playerYVel, 2 )
+				print( "SHAKE ")
+				timeonground = timeonground + 1
+				if (damagecheckdone == false) then
+					damagecheckdone = true;
+					print ("begin dmg check")
+					dmgCheck()
+					print ("end dmg check")
+				end
+				if(timeonground > 10) then
+					gonnaStomp = false;
+					print( "Reseting SUPERHERO_LANDING")
+					ComponentSetValue(player_data, "destroy_ground", 0)
+					ComponentSetValue(player_data, "eff_hg_damage_max", 95)
+					ComponentSetValue(player_data, "eff_hg_damage_min", 10)
+					ComponentSetValue(player_data, "eff_hg_size_x", 6.42)
+					ComponentSetValue(player_data, "eff_hg_size_y", 5.14)
+					RemoveRepelCharge(player_entity)	
+					timeonground = 0;
+				end
+			end
 		end
 	end
 end
+
 
