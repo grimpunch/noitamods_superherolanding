@@ -1,9 +1,9 @@
 dofile( "data/scripts/lib/coroutines.lua" )
 dofile( "data/scripts/lib/utilities.lua" )
 
-local RADIUS = 50.0
-local MAX_STRENGTH = 20.0
-local MIN_STRENGTH = 0.5
+local RADIUS = 30.0
+local MAX_STRENGTH = 75.0
+local MIN_STRENGTH = 1.0
 
 local function distance(x, y, x2, y2)
 
@@ -105,7 +105,6 @@ async_loop(function()
 			local dir_x = dir_x / len
 			local dir_y = dir_y / len
 
-			print ("PUSH ", dir_x * power) 
 			PhysicsApplyForce(prop, dir_x * power, dir_y * power)
 
 		end
